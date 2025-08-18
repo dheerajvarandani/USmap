@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HH Graph — U.S. State Insights</title>
+  
+  <!-- External libs -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3" defer></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+
+  <!-- Styles: fresh look (light UI, soft cards, different layout) -->
+  <style>
+    :root{
+      --bg:#f6f8fb;
+      --surface:#ffffff;
+      --ink:#0f172a;        /* slate-900 */
+      --muted:#475569;       /* slate-600 */
+      --border:#e5e7eb;      /* gray-200 */
+      --brand:#2563eb;       /* indigo-600 */
+      --brand-2:#0ea5e9;     /* sky-500 */
+      --accent:#22c55e;      /* green-500 */
+      --warn:#f59e0b;        /* amber-500 */
+      --danger:#ef4444;      /* red-500 */
+      --focus: 0 0 0 3px rgba(37,99,235,.25);
+    }
+
+    *{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      color:var(--ink);
+      background:linear-gradient(180deg, #f6f8fb 0%, #eef2f7 100%);
+      -webkit-font-smoothing:antialiased;
+      -moz-osx-font-smoothing:grayscale;
+    }
+
+    header{
+      position:sticky; top:0; z-index:50;
+      backdrop-filter:saturate(140%) blur(6px);
+      background:rgba(255,255,255,.7);
+      border-bottom:1px solid var(--border);
+    }
+    .nav{
+      max-width:1200px; margin:0 auto; padding:1rem 5vw;
+      display:flex; align-items:center; gap:1rem; justify-content:space-between;
+    }
+    .brand{
+      display:flex; align-items:center; gap:.75rem;
+      font-weight:800; letter-spacing:.2px; color:var(--ink);
+    }
+    .brand-badge{width:36px;height:36px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-2)); box-shadow:0 4px 18px rgba(37,99,235,.35)}
+    .kicker{font-size:.8rem; color:var(--muted)}
+
+    .wrap{max-width:1200px; margin:0 auto; padding:2rem 5vw}
+
+    /* Top row: map + details */
+    .row{
+      display:grid; grid-template-columns: 1.4fr .95fr; gap:1.25rem; align-items:start;
+    }
+
+    .panel{
+      background:var(--surface); border:1px solid var(--border); border-radius:16px; overflow:hidden;
+      box-shadow:0 6px 20px rgba(15,23,42,.06);
+    }
+    .panel-head{ padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border)}
+    .panel-head h2{font-size:1rem; font-weight:700}
+    .panel-body{ padding:1rem; }
+
+    /* Legend pills */
+    .legend{ display:flex; gap:.5rem; flex-wrap:wrap }
+    .pill{ display:inline-flex; align-items:center; gap:.5rem; border:1px solid var(--border); padding:.4rem .6rem; border-radius:999px; font-size:.8rem; color:var(--muted); background:#fff}
+    .dot{ width:10px; height:10px; border-radius:999px }
+
+    /* Map area */
+    #map{ width:100%; height:min(70vh,680px); position:relative; }
+    svg{ width:100%; height:100% }
+    .state{ fill:#cbd5e1; stroke:#94a3b8; stroke-width:.6; transition: fill .2s ease, stroke-width .2s ease; cursor:pointer }
+    .state[data-race="no"]{ fill:#e2e8f0 }
+    .state[data-race="general"]{ fill:#a5b4fc }
+    .state[data-race="battleground"]{ fill:#60a5fa }
+    .state[data-race="important"]{ fill:#34d399 }
+    .state:hover{ filter:brightness(1.05); stroke-width:1 }
+
+    /* Tooltip */
+    #tooltip{ position:absolute; pointer-events:none; display:none; z-index:20; }
+    .tt{
+      background:#fff; color:var(--ink); border:1px solid var(--border); border-radius:12px; padding:.8rem 1rem; box-shadow:0 8px 28px rgba(15,23,42,.12); width:260px
+    }
+    .tt h3{font-size:1rem; font-weight:800; margin-bottom:.25rem}
+    .tt p{font-size:.875rem; color:var(--muted)}
+
+    /* Details (sidebar) */
+    .details h3{ font-size:1.1rem; margin-bottom:.25rem }
+    .subtle{ color:var(--muted); font-size:.9rem }
+    .grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap: .75rem }
+    .stat{
+      border:1px dashed var(--border); border-radius:12px; padding:.75rem .9rem; background:#fff
+    }
+    .stat label{ display:block; font-size:.75rem; color:var(--muted); margin-bottom:.25rem }
+    .stat strong{ font-size:1.1rem }
+
+    .group{ margin-top:1rem }
+    .group h4{ font-size:.95rem; margin-bottom:.5rem; color:var(--muted) }
+    .list{ border:1px solid var(--border); border-radius:12px; overflow:hidden; background:#fff }
+    .item{ display:flex; justify-content:space-between; gap:1rem; padding:.6rem .8rem; border-bottom:1px solid var(--border); font-size:.92rem }
+    .item:last-child{ border-bottom:none }
+
+    /* Insight cards */
+    .insights{ margin-top:1rem; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap: .75rem }
+    .card{ background:#fff; border:1px solid var(--border); border-radius:12px; padding:1rem }
+    .card h5{ font-size:.9rem; color:var(--muted); margin-bottom:.5rem }
+
+    /* Footer */
+    footer{ color:var(--muted); text-align:center; font-size:.85rem; padding:2rem 0 }
+
+    /* Password gate (glass) */
+    #loginOverlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(8px) saturate(120%); background:rgba(226,232,240,.65); z-index:9999 }
+    #loginBox{ width:360px; background:#ffffff; border:1px solid var(--border); border-radius:16px; box-shadow:0 20px 60px rgba(15,23,42,.15); padding:1.25rem }
+    #loginBox h2{ font-size:1.1rem; margin-bottom:.25rem }
+    #loginBox p{ color:var(--muted); font-size:.9rem }
+    #loginBox input{ width:100%; padding:.75rem .9rem; margin:.9rem 0 .75rem; border:1px solid var(--border); border-radius:10px; outline:none }
+    #loginBox input:focus{ box-shadow: var(--focus) }
+    #loginBox button{ width:100%; padding:.75rem .9rem; background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#fff; border:none; border-radius:10px; font-weight:700; cursor:pointer }
+    #loginError{ color:var(--danger); display:none; font-size:.85rem; margin-top:.5rem }
+
+    /* Responsive */
+    @media (max-width: 1100px){ .row{ grid-template-columns:1fr } .insights{ grid-template-columns:repeat(2,minmax(0,1fr)) } }
+    @media (max-width: 640px){ .grid{ grid-template-columns:1fr } .insights{ grid-template-columns:1fr } #map{ height:58vh } }
+  </style>
+</head>
+<body>
+  <!-- Password Gate -->
+  <div id="loginOverlay">
+    <div id="loginBox">
+      <h2>Restricted Access</h2>
+      <p>Enter the password to view the HH Graph map.</p>
+      <input id="passwordInput" type="password" placeholder="Password" />
+      <button id="loginBtn">Continue</button>
+      <div id="loginError">Incorrect password</div>
+    </div>
+  </div>
+
+  <header>
+    <div class="nav">
+      <div class="brand">
+        <span class="brand-badge" aria-hidden="true"></span>
+        <div>
+          HH Graph <span class="kicker">• U.S. State Insights</span>
+        </div>
+      </div>
+      <div class="kicker">Modeled on a Senate-style map, restyled for HH Graph</div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="row">
+      <article class="panel">
+        <div class="panel-head">
+          <h2>Interactive U.S. Map</h2>
+          <div class="legend" aria-label="Legend">
+            <span class="pill"><span class="dot" style="background:#e2e8f0"></span>No Race</span>
+            <span class="pill"><span class="dot" style="background:#a5b4fc"></span>General</span>
+            <span class="pill"><span class="dot" style="background:#60a5fa"></span>Battleground</span>
+            <span class="pill"><span class="dot" style="background:#34d399"></span>Important</span>
+          </div>
+        </div>
+        <div class="panel-body">
+          <div id="map"></div>
+          <div id="tooltip"><div class="tt"></div></div>
+        </div>
+      </article>
+
+      <aside id="sidebar" class="panel details" aria-live="polite">
+        <div class="panel-head">
+          <h2>State Details</h2>
+          <span class="kicker">Select a state</span>
+        </div>
+        <div class="panel-body" id="detailsBody">
+          <!-- Filled by JS -->
+        </div>
+      </aside>
+    </section>
+
+    <section class="panel" style="margin-top:1.25rem">
+      <div class="panel-head"><h2>Key Insights</h2><span class="kicker">Top categories per state</span></div>
+      <div class="panel-body">
+        <div id="insightGrid" class="insights"></div>
+      </div>
+    </section>
+  </main>
+
+  <footer>© 2025 HH Graph. All rights reserved.</footer>
+
+  <script>
+  (function(){
+    // ===== Password Gate (same logic, different UI) =====
+    const HASHED = "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791"; // sha256("demo123")
+    async function sha256(s){
+      const buf = new TextEncoder().encode(s);
+      const hash = await crypto.subtle.digest('SHA-256', buf);
+      return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+
+    const loginBtn = document.getElementById('loginBtn');
+    const passInput = document.getElementById('passwordInput');
+    loginBtn.addEventListener('click', attemptLogin);
+    passInput.addEventListener('keyup', e=>{ if(e.key==='Enter') attemptLogin(); });
+
+    async function attemptLogin(){
+      if(await sha256(passInput.value) === HASHED){
+        document.getElementById('loginOverlay').style.display='none';
+        initSite();
+      } else {
+        document.getElementById('loginError').style.display='block';
+      }
+    }
+
+    // ===== App State =====
+    let stateData = new Map();
+    let currentState = null;
+
+    // ===== Utils =====
+    const getRaceCategory = (type)=>{
+      if(!type || /no race/i.test(type)) return 'no';
+      if(/battleground/i.test(type)) return 'battleground';
+      if(/important/i.test(type)) return 'important';
+      return 'general';
+    };
+
+    const categoryFill = (type)=>{
+      if(type==='no') return '#e2e8f0';
+      if(type==='battleground') return '#60a5fa';
+      if(type==='important') return '#34d399';
+      return '#a5b4fc';
+    };
+
+    const fmtNum = (n)=> n!=null && n!=='' ? Number(n).toLocaleString() : '-';
+    const fmtPct = (n)=> n!=null && n!=='' ? `${n}%` : '-';
+
+    // ===== Data Mapping (keeps original functionality / columns) =====
+    function extractTop(row, start){
+      return [
+        {Name: row[start],   Data: row[start+1]},
+        {Name: row[start+3], Data: row[start+4]},
+        {Name: row[start+6], Data: row[start+7]},
+      ].filter(x=>x && x.Name);
+    }
+
+    // ===== Rendering =====
+    function renderMap(us){
+      const mapEl = document.getElementById('map');
+      const svg = d3.select(mapEl).append('svg');
+      const {clientWidth:W, clientHeight:H} = mapEl;
+      svg.attr('viewBox', `0 0 ${W} ${H}`);
+
+      const projection = d3.geoAlbersUsa().translate([W/2, H/2]).scale(W*1.25);
+      const path = d3.geoPath(projection);
+      const states = topojson.feature(us, us.objects.states).features;
+
+      const g = svg.append('g');
+      g.selectAll('path').data(states).enter().append('path')
+        .attr('class','state')
+        .attr('d', path)
+        .attr('data-race', d => getRaceCategory(stateData.get(d.properties.name)?.["Race Type"]))
+        .on('mouseenter', (ev,d)=> showTooltip(ev, d.properties.name))
+        .on('mousemove', positionTooltip)
+        .on('mouseleave', hideTooltip)
+        .on('click', (ev,d)=> selectState(d.properties.name));
+    }
+
+    function showTooltip(ev, name){
+      const entry = stateData.get(name);
+      const tt = document.querySelector('#tooltip');
+      const box = tt.querySelector('.tt');
+      const cat = getRaceCategory(entry?.["Race Type"]);
+      box.innerHTML = `
+        <h3>${name}</h3>
+        <p>${entry?.["Race Type"] ?? 'No Race'} · <span style="color:${categoryFill(cat)}">${cat}</span></p>
+      `;
+      tt.style.display='block';
+      positionTooltip(ev);
+    }
+    function positionTooltip(ev){
+      const tt = document.getElementById('tooltip');
+      const { pageX:x, pageY:y } = ev;
+      tt.style.left = (x + 16) + 'px';
+      tt.style.top  = (y + 16) + 'px';
+    }
+    function hideTooltip(){ document.getElementById('tooltip').style.display='none'; }
+
+    function selectState(name){
+      currentState = name;
+      const entry = stateData.get(name);
+      renderDetails(name, entry);
+      renderInsights(entry);
+    }
+
+    function renderDetails(name, data){
+      const el = document.getElementById('detailsBody');
+      if(!data){ el.innerHTML = `<div class="subtle">Select a state on the map.</div>`; return; }
+      const pop = `
+        <div class="grid">
+          <div class="stat"><label>Total Population</label><strong>${fmtNum(data["Total Population"])}</strong></div>
+          <div class="stat"><label>Eligible Voter</label><strong>${fmtPct(data["Eligible Voter"])}</strong></div>
+          <div class="stat"><label>White</label><strong>${fmtPct(data["% White"])}</strong></div>
+          <div class="stat"><label>Hispanic</label><strong>${fmtPct(data["% Hispanic"])}</strong></div>
+          <div class="stat"><label>African American</label><strong>${fmtPct(data["% African American"])}</strong></div>
+          <div class="stat"><label>Asian</label><strong>${fmtPct(data["% Asian"])}</strong></div>
+        </div>`;
+
+      el.innerHTML = `
+        <h3>${name}</h3>
+        <div class="subtle" style="margin:.1rem 0 .6rem">${data["Race Type"] ?? ''}${data["Race Description"]? ' • ' + data["Race Description"] : ''}</div>
+        ${data["Narrative"]? `<div class="group"><h4>Narrative</h4><div class="subtle">${data["Narrative"]}</div></div>`:''}
+        <div class="group"><h4>Population</h4>${pop}</div>
+      `;
+    }
+
+    function renderInsights(data){
+      const grid = document.getElementById('insightGrid');
+      const categories = [
+        ["Top Shows", data?.["Top Shows"]],
+        ["Top Channels", data?.["Top Channels"]],
+        ["Top Mobile Apps", data?.["Top Mobile Apps"]],
+        ["Top Location Visits", data?.["Top Location Visits"]],
+        ["Top Segments", data?.["Top Segments"]]
+      ];
+      grid.innerHTML = categories.map(([label, items])=>{
+        const rows = (items && items.length)
+          ? items.map(i=>`<div class="item"><span>${i.Name}</span><span>${i.Data ?? '-'}</span></div>`).join('')
+          : `<div class="item"><span>-</span><span>-</span></div>`;
+        return `<div class="card"><h5>${label}</h5><div class="list">${rows}</div></div>`;
+      }).join('');
+    }
+
+    // ===== Init Site =====
+    function initSite(){
+      if(typeof XLSX==='undefined'){ fatal('SheetJS failed to load.'); return; }
+      Promise.all([
+        d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json'),
+        fetch('2025 - Top Political Races and Data.xlsx').then(r=>{ if(!r.ok) throw new Error('Data file missing'); return r.arrayBuffer(); })
+      ])
+      .then(([us, buf])=>{
+        const wb = XLSX.read(buf,{type:'array'});
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const table = XLSX.utils.sheet_to_json(sheet,{header:1});
+        const rows = table.slice(2); // skip header rows like original
+
+        // Build map keyed by state name
+        rows.forEach(row=>{
+          const state = row[0]; if(!state) return;
+          const entry = {
+            "Race Type": row[2],
+            "Race Description": row[3],
+            "Total Population": row[4],
+            "% White": row[5], "% Hispanic": row[6], "% Asian": row[7], "% African American": row[8],
+            "Narrative": row[9],
+            "Eligible Voter": row[55],
+            "Top Shows": extractTop(row, 10),
+            "Top Channels": extractTop(row, 19),
+            "Top Mobile Apps": extractTop(row, 28),
+            "Top Location Visits": extractTop(row, 37),
+            "Top Segments": extractTop(row, 46)
+          };
+          stateData.set(state, entry);
+        });
+
+        renderMap(us);
+        // Prime UI with a neutral state
+        document.getElementById('detailsBody').innerHTML = `<div class="subtle">Select a state on the map.</div>`;
+        renderInsights(null);
+      })
+      .catch(err=> fatal(err.message));
+    }
+
+    function fatal(msg){
+      const map = document.getElementById('map');
+      map.innerHTML = `<p style="color:#ef4444;padding:2rem;text-align:center">${msg}</p>`;
+    }
+  })();
+  </script>
+</body>
+</html>
