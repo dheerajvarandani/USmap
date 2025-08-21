@@ -3,164 +3,113 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Senate Election</title>
-  
+  <title>Sabio | AppScience | US Map</title>
+
   <!-- External libs -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js" defer></script>
-  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3" defer></script>
-  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3"></script>
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
 
-  <!-- Styles: fresh look (light UI, soft cards, different layout) -->
   <style>
-
     :root{
-      --bg:#0b0f14;
-      --surface:#111827;        /* slate-900 */
-      --elev:#0f172a;           /* deeper panel */
-      --ink:#ff8000;            /* light text */
-      --muted:#94a3b8;          /* slate-400 */
-      --border:#1f2937;         /* slate-800 */
-      --brand:#f59e0b;          /* amber-500 */
-      --brand-2:#fb923c;        /* orange-400 */
-      --accent:#22c55e;         /* green-500 */
-      --warn:#f59e0b;           /* amber-500 */
-      --danger:#ef4444;         /* red-500 */
-      --focus: 0 0 0 3px rgba(245,158,11,.35);
+      --bg:#0a0a0f;
+      --surface:#14141d;
+      --border:rgba(255,255,255,.08);
+      --ink:#f1f5f9;
+      --muted:#94a3b8;
+      --brand:#ff8000;
+      --brand-2:#ff5722;
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%}
     body{
-      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Inter, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+      font-family: Inter, ui-sans-serif, system-ui;
+      background: radial-gradient(circle at top left, #100131, #151574 100%),
+                  linear-gradient(135deg, #ff800066, #0a0a0f 70%);
       color:var(--ink);
-      background: radial-gradient(1200px 600px at 20% -10%, #111827 0%, rgba(17,24,39,0) 60%),
-                  radial-gradient(1200px 600px at 120% 10%, rgba(245,158,11,.18) 0%, rgba(245,158,11,0) 50%),
-                  linear-gradient(180deg, #0b0f14 0%, #0b0f14 100%);
       -webkit-font-smoothing:antialiased;
       -moz-osx-font-smoothing:grayscale;
     }
 
     header{
       position:sticky; top:0; z-index:50;
-      backdrop-filter:saturate(140%) blur(8px);
-      background:rgba(15,23,42,.65);
+      backdrop-filter: blur(10px);
+      background:rgba(20,20,30,.7);
       border-bottom:1px solid var(--border);
     }
-    .nav{ max-width:1200px; margin:0 auto; padding:1rem 5vw; display:flex; align-items:center; gap:1rem; justify-content:space-between; }
-    .brand{ display:flex; align-items:center; gap:.75rem; font-weight:800; letter-spacing:.2px; color:var(--ink); }
-    .brand img{ height:32px; width:auto; object-fit:contain; filter: drop-shadow(0 2px 8px rgba(0,0,0,.3)); }
-    .kicker{font-size:.8rem; color:var(--muted)}
+    .nav{ max-width:1200px; margin:0 auto; padding:1rem 5vw; display:flex; align-items:center; justify-content:space-between; }
+    .brand{ display:flex; align-items:center; gap:.75rem; font-weight:800; color:var(--ink); }
+    .brand img{ height:36px; width:auto }
+    .kicker{ font-size:.85rem; color:var(--muted) }
 
-    .wrap{max-width:1200px; margin:0 auto; padding:2rem 5vw}
+    .wrap{ max-width:1200px; margin:0 auto; padding:2rem 5vw; }
 
-    /* Top row: map + details */
-    .row{ display:grid; grid-template-columns: 2.4fr .95fr; gap:1.25rem; align-items:start; }
-
-    .panel{ background:linear-gradient(180deg, var(--elev), #0b1220); border:1px solid var(--border); border-radius:16px; overflow:hidden; box-shadow:0 10px 30px rgba(0,0,0,.25); }
-    .panel-head{ padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border)}
-    .panel-head h2{font-size:1rem; font-weight:700}
+    .row{ display:grid; grid-template-columns: 2fr 0.85fr; gap:1.5rem; }
+    .panel{ background:rgba(20,20,30,.75); border:1px solid var(--border); border-radius:20px; overflow:hidden; box-shadow:0 12px 32px rgba(0,0,0,.6); backdrop-filter: blur(12px); }
+    .panel-head{ padding:1rem 1.25rem; display:flex; align-items:center; justify-content:space-between; border-bottom:1px solid var(--border); }
+    .panel-head h2{ font-size:1rem; font-weight:700; color:var(--brand); }
     .panel-body{ padding:1rem; }
 
-    /* Legend pills */
-    .legend{ display:flex; gap:.5rem; flex-wrap:wrap }
-    .pill{ display:inline-flex; align-items:center; gap:.5rem; border:1px solid var(--border); padding:.4rem .6rem; border-radius:999px; font-size:.8rem; color:var(--muted); background:linear-gradient(180deg,#0f172a,#0b1220)}
+    .legend{ display:flex; gap:.6rem; flex-wrap:wrap }
+    .pill{ background:rgba(255,255,255,.04); border:1px solid var(--border); padding:.4rem .8rem; border-radius:999px; font-size:.8rem; display:flex; align-items:center; gap:.4rem; }
     .dot{ width:10px; height:10px; border-radius:999px }
 
-    /* Map area */
-    #map{ width:100%; height:min(70vh,680px); position:relative; }
+    #map{ width:100%; height:min(70vh,600px); position:relative; border-radius:14px; overflow:hidden; }
     svg{ width:100%; height:100% }
-    .state{ fill:#1f2937; stroke:#334155; stroke-width:.6; transition: fill .2s ease, stroke-width .2s ease, filter .2s ease; cursor:pointer }
-    .state[data-race="no"]{ fill:#0b1220 }
-    .state[data-race="general"]{ fill:#f59e0b33 }
-    .state[data-race="battleground"]{ fill:#fb923c55 }
-    .state[data-race="important"]{ fill:#f59e0bbb }
-    .state:hover{ filter:brightness(1.2); stroke-width:1 }
+    .state{ fill:#2a2a3d; stroke:#9797c4; stroke-width:.6; cursor:pointer; transition:.25s; }
+    .state[data-race="no"]{ fill:#1a1a25 }
+    .state[data-race="general"]{ fill:#ff800033 }
+    .state[data-race="battleground"]{ fill:#ff800077 }
+    .state[data-race="important"]{ fill:#ff8000cc }
+    .state:hover{ stroke-width:1.2; filter:brightness(1.3) }
 
-    /* Tooltip */
-    #tooltip{ position:absolute; pointer-events:none; display:none; z-index:20; }
-    .tt{ background:linear-gradient(180deg,#0b1220,#0f172a); color:var(--ink); border:1px solid var(--border); border-radius:12px; padding:.8rem 1rem; box-shadow:0 12px 36px rgba(0,0,0,.45); width:260px }
-    .tt h3{font-size:1rem; font-weight:800; margin-bottom:.25rem}
-    .tt p{font-size:.875rem; color:var(--muted)}
+    #tooltip{ position:absolute; display:none; pointer-events:none; }
+    .tt{ background:#14141d; border:1px solid var(--border); border-radius:12px; padding:.8rem 1rem; box-shadow:0 12px 40px rgba(0,0,0,.5); max-width:260px; }
+    .tt h3{ font-size:1rem; font-weight:700; color:var(--brand) }
+    .tt p{ font-size:.85rem; color:var(--muted) }
 
-    /* Details (sidebar) */
-    .details h3{ font-size:1.1rem; margin-bottom:.25rem }
+    .details h3{ font-size:1.1rem; color:var(--brand) }
     .subtle{ color:var(--muted); font-size:.9rem }
-    .grid{ display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap: .75rem }
-    .stat{ border:1px dashed var(--border); border-radius:12px; padding:.75rem .9rem; background:linear-gradient(180deg,#0b1220,#0f172a) }
+    .grid{ display:grid; grid-template-columns:repeat(2,1fr); gap:.75rem }
+    .stat{ background:rgba(255,255,255,.02); border:1px solid var(--border); border-radius:12px; padding:.75rem }
     .stat label{ display:block; font-size:.75rem; color:var(--muted); margin-bottom:.25rem }
     .stat strong{ font-size:1.1rem; color:#fff }
 
     .group{ margin-top:1rem }
-    .group h4{ font-size:.95rem; margin-bottom:.5rem; color:var(--muted) }
-    .list{ border:1px solid var(--border); border-radius:12px; overflow:hidden; background:linear-gradient(180deg,#0b1220,#0f172a) }
-    .item{ display:flex; justify-content:space-between; gap:1rem; padding:.6rem .8rem; border-bottom:1px solid var(--border); font-size:.92rem }
+    .group h4{ font-size:.9rem; margin-bottom:.4rem; color:var(--muted) }
+    .list{ border:1px solid var(--border); border-radius:12px; overflow:hidden; background:rgba(255,255,255,.02) }
+    .item{ display:flex; justify-content:space-between; padding:.6rem .8rem; border-bottom:1px solid var(--border); font-size:.9rem }
     .item:last-child{ border-bottom:none }
 
-    /* Insight cards */
-    .insights{ margin-top:1rem; display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap: .75rem }
-    .card{ background:linear-gradient(180deg,#0b1220,#0f172a); border:1px solid var(--border); border-radius:12px; padding:1rem }
-    .card h5{ font-size:.9rem; color:var(--muted); margin-bottom:.5rem }
+    .insights{ margin-top:1rem; display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem }
+    .card{ background:rgba(255,255,255,.03); border:1px solid var(--border); border-radius:14px; padding:1rem; box-shadow:0 8px 28px rgba(0,0,0,.5); min-height:120px }
+    .card h5{ font-size:.85rem; color:var(--brand); margin-bottom:.5rem }
 
-    /* Footer */
-    footer{ color:var(--muted); text-align:center; font-size:.85rem; padding:2rem 0 }
+    footer{ text-align:center; font-size:.85rem; color:var(--muted); padding:2rem 0 }
 
-    /* Password gate (glass) */
-    #loginOverlay{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; backdrop-filter: blur(10px) saturate(120%); background:rgba(2,6,12,.65); z-index:9999 }
-    #loginBox{ width:360px; background:linear-gradient(180deg,#0b1220,#0f172a); border:1px solid var(--border); border-radius:16px; box-shadow:0 20px 60px rgba(0,0,0,.5); padding:1.25rem }
-    #loginBox h2{ font-size:1.1rem; margin-bottom:.25rem }
-    #loginBox p{ color:var(--muted); font-size:.9rem }
-    #loginBox input{ width:100%; padding:.75rem .9rem; margin:.9rem 0 .75rem; background:#0b0f14; color:#fff; border:1px solid var(--border); border-radius:10px; outline:none }
-    #loginBox input:focus{ box-shadow: var(--focus) }
-    #loginBox button{ width:100%; padding:.75rem .9rem; background:linear-gradient(135deg,var(--brand),var(--brand-2)); color:#0b0f14; border:none; border-radius:10px; font-weight:800; cursor:pointer }
-    #loginError{ color:var(--danger); display:none; font-size:.85rem; margin-top:.5rem }
+    .icon-btn{ width:36px; height:36px; border-radius:8px; background:rgba(255,255,255,.04); border:1px solid var(--border); display:flex; align-items:center; justify-content:center; cursor:pointer }
 
-    /* Info icon */
-    .icon-btn{ display:inline-flex; align-items:center; justify-content:center; width:36px; height:36px; border-radius:10px; background:linear-gradient(180deg,#0b1220,#0f172a); border:1px solid var(--border); cursor:pointer }
-    .icon-btn:hover{ filter:brightness(1.15) }
-
-    /* Modal */
-    .modal-backdrop{ position:fixed; inset:0; background:rgba(2,6,12,.7); backdrop-filter: blur(8px); display:none; align-items:center; justify-content:center; z-index:60 }
-    .modal{ width:min(560px,92vw); background:linear-gradient(180deg,#0b1220,#0f172a); border:1px solid var(--border); border-radius:16px; box-shadow:0 24px 70px rgba(0,0,0,.55); overflow:hidden }
-    .modal header{ display:flex; align-items:center; justify-content:space-between; padding:1rem 1.25rem; border-bottom:1px solid var(--border); background:linear-gradient(180deg,#0f172a,#0b1220) }
-    .modal h3{ font-size:1rem }
+    .modal-backdrop{ position:fixed; inset:0; background:rgba(0,0,0,.7); display:none; align-items:center; justify-content:center; z-index:60 }
+    .modal{ background:#14141d; border:1px solid var(--border); border-radius:16px; box-shadow:0 24px 64px rgba(0,0,0,.7); width:min(560px,92vw); }
+    .modal header{ display:flex; justify-content:space-between; align-items:center; padding:1rem 1.25rem; border-bottom:1px solid var(--border) }
+    .modal h3{ font-size:1rem; color:var(--brand) }
     .modal .content{ padding:1rem 1.25rem; color:var(--muted) }
-
-    @media (max-width: 1100px){ .row{ grid-template-columns:1fr } .insights{ grid-template-columns:repeat(2,minmax(0,1fr)) } }
-    @media (max-width: 640px){ .grid{ grid-template-columns:1fr } .insights{ grid-template-columns:1fr } #map{ height:58vh } }
   </style>
 </head>
 <body>
-  <!-- Password Gate -->
-  <div id="loginOverlay">
-    <div id="loginBox">
-      <h2>Restricted Access</h2>
-      <p>Enter the password to view the HH Graph map.</p>
-      <input id="passwordInput" type="password" placeholder="Password" />
-      <button id="loginBtn">Continue</button>
-      <div id="loginError">Incorrect password</div>
-    </div>
-  </div>
-
   <header>
     <div class="nav">
       <div class="brand">
-        <img src="./assets/logo.png" alt="Company Logo" />
-        <div>Senate Election <span class="kicker">• U.S. State Insights</span></div>
+        <img src="./assets/logo.png" alt="Logo" />
+        <div>U.S. State Insights</div>
       </div>
-      <div class="kicker" style="display:flex; align-items:center; gap:.6rem">
-        <!--span>Modeled on a Senate-style map</span-->
-        <button id="infoBtn" class="icon-btn" aria-label="About this map" title="About">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10Z" stroke="#fb923c" stroke-width="1.5"/>
-            <path d="M12 8.5h.01" stroke="#fb923c" stroke-width="2" stroke-linecap="round"/>
-            <path d="M12 11v6" stroke="#fb923c" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
+      <div style="display:flex; gap:.6rem; align-items:center">
+        <span class="kicker">Interactive map</span>
+        <button id="infoBtn" class="icon-btn" aria-label="About">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="var(--brand)" stroke-width="1.5"/><path d="M12 8h.01M12 11v5" stroke="var(--brand)" stroke-width="1.5" stroke-linecap="round"/></svg>
         </button>
       </div>
-    </div>
-      </div>
-      </div>
-
     </div>
   </header>
 
@@ -169,11 +118,11 @@
       <article class="panel">
         <div class="panel-head">
           <h2>Interactive U.S. Map</h2>
-          <div class="legend" aria-label="Legend">
-            <span class="pill"><span class="dot" style="background:#e2e8f0"></span>No Race</span>
-            <span class="pill"><span class="dot" style="background:#a5b4fc"></span>General</span>
-            <span class="pill"><span class="dot" style="background:#60a5fa"></span>Battleground</span>
-            <span class="pill"><span class="dot" style="background:#34d399"></span>Important</span>
+          <div class="legend">
+            <span class="pill"><span class="dot" style="background:#1a1a25"></span>No Race</span>
+            <span class="pill"><span class="dot" style="background:#ff800033"></span>General</span>
+            <span class="pill"><span class="dot" style="background:#ff800077"></span>Battleground</span>
+            <span class="pill"><span class="dot" style="background:#ff8000cc"></span>Important</span>
           </div>
         </div>
         <div class="panel-body">
@@ -182,91 +131,64 @@
         </div>
       </article>
 
-      <aside id="sidebar" class="panel details" aria-live="polite">
+      <aside id="sidebar" class="panel details">
         <div class="panel-head">
           <h2>State Details</h2>
-          <span class="kicker">Select a state</span>
         </div>
-        <div class="panel-body" id="detailsBody">
-          <!-- Filled by JS -->
-        </div>
+        <div class="panel-body" id="detailsBody"></div>
       </aside>
     </section>
 
     <section class="panel" style="margin-top:1.25rem">
-      <div class="panel-head"><h2>Key Insights</h2><span class="kicker">Top categories per state</span></div>
-      <div class="panel-body">
-        <div id="insightGrid" class="insights"></div>
-      </div>
+      <div class="panel-head"><h2>Key Insights</h2></div>
+      <div class="panel-body"><div id="insightGrid" class="insights"></div></div>
     </section>
   </main>
 
-    <!-- Info Modal -->
-    <div id="aboutModal" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="aboutTitle">
-      <div class="modal">
-        <header>
-          <h3 id="aboutTitle">About This Map</h3>
-          <button id="closeModal" class="icon-btn" aria-label="Close">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <path d="M6 6l12 12M18 6L6 18" stroke="#fb923c" stroke-width="1.5" stroke-linecap="round"/>
-            </svg>
-          </button>
-        </header>
-        <div class="content">
-          <p>This HH Graph interface presents demographic segments and key media insights for each U.S. state. Select a state to view its population mix, eligibility, and top categories across shows, channels, apps, locations, and segments.</p>
-        </div>
+  <!-- Modal -->
+  <div id="aboutModal" class="modal-backdrop">
+    <div class="modal">
+      <header>
+        <h3>About This Map</h3>
+        <button id="closeModal" class="icon-btn" aria-label="Close">✕</button>
+      </header>
+      <div class="content">
+        <p>This HH Graph interface presents demographic segments and key insights for each U.S. state. Data is sourced from your Excel sheet, styled with a modern dark gradient theme and orange highlights.</p>
       </div>
     </div>
+  </div>
 
-  <footer>© 2025 App Science x Sabio. All rights reserved.</footer>
+  <footer>© All rights reserved.</footer>
 
   <script>
   (function(){
-    // ===== Password Gate (same logic, different UI) =====
-    const HASHED = "d3ad9315b7be5dd53b31a273b3b3aba5defe700808305aa16a3062b76658a791"; // sha256("demo123")
-    async function sha256(s){
-      const buf = new TextEncoder().encode(s);
-      const hash = await crypto.subtle.digest('SHA-256', buf);
-      return [...new Uint8Array(hash)].map(b=>b.toString(16).padStart(2,'0')).join('');
-    }
-
-    const loginBtn = document.getElementById('loginBtn');
-    const passInput = document.getElementById('passwordInput');
-    loginBtn.addEventListener('click', attemptLogin);
-    passInput.addEventListener('keyup', e=>{ if(e.key==='Enter') attemptLogin(); });
-
-    async function attemptLogin(){
-      if(await sha256(passInput.value) === HASHED){
-        document.getElementById('loginOverlay').style.display='none';
-        initSite();
-      } else {
-        document.getElementById('loginError').style.display='block';
-      }
-    }
+    // ===== Modal controls =====
+    const infoBtn = document.getElementById('infoBtn');
+    const aboutModal = document.getElementById('aboutModal');
+    const closeModal = document.getElementById('closeModal');
+    if(infoBtn){ infoBtn.addEventListener('click', ()=> aboutModal.style.display='flex'); }
+    if(closeModal){ closeModal.addEventListener('click', ()=> aboutModal.style.display='none'); }
+    document.addEventListener('keydown', e=>{ if(e.key==='Escape') aboutModal.style.display='none'; });
 
     // ===== App State =====
     let stateData = new Map();
     let currentState = null;
 
-    // ===== Utils =====
+    // ===== Helpers =====
     const getRaceCategory = (type)=>{
       if(!type || /no race/i.test(type)) return 'no';
       if(/battleground/i.test(type)) return 'battleground';
       if(/important/i.test(type)) return 'important';
       return 'general';
     };
-
     const categoryFill = (type)=>{
-      if(type==='no') return '#e2e8f0';
-      if(type==='battleground') return '#60a5fa';
-      if(type==='important') return '#34d399';
-      return '#a5b4fc';
+      if(type==='no') return '#1a1a25';
+      if(type==='battleground') return '#ff7b3977';
+      if(type==='important') return '#ff7b39cc';
+      return '#ff7b3944';
     };
-
     const fmtNum = (n)=> n!=null && n!=='' ? Number(n).toLocaleString() : '-';
     const fmtPct = (n)=> n!=null && n!=='' ? `${n}%` : '-';
-
-    // ===== Data Mapping (keeps original functionality / columns) =====
     function extractTop(row, start){
       return [
         {Name: row[start],   Data: row[start+1]},
@@ -310,11 +232,22 @@
       positionTooltip(ev);
     }
     function positionTooltip(ev){
-      const tt = document.getElementById('tooltip');
-      const { pageX:x, pageY:y } = ev;
-      tt.style.left = (x + 16) + 'px';
-      tt.style.top  = (y + 16) + 'px';
-    }
+const tt = document.getElementById('tooltip');
+const map = document.getElementById('map');
+const rect = map.getBoundingClientRect();
+// Use viewport coords (clientX/Y) minus map's top-left to anchor inside the map
+let x = ev.clientX - rect.left + 16;
+let y = ev.clientY - rect.top + 16;
+// Clamp so tooltip stays within the map bounds
+const pad = 8;
+const ttBox = tt.firstElementChild?.getBoundingClientRect();
+const w = ttBox ? ttBox.width : 260;
+const h = ttBox ? ttBox.height : 120;
+x = Math.max(pad, Math.min(x, rect.width - w - pad));
+y = Math.max(pad, Math.min(y, rect.height - h - pad));
+tt.style.left = x + 'px';
+tt.style.top = y + 'px';
+}
     function hideTooltip(){ document.getElementById('tooltip').style.display='none'; }
 
     function selectState(name){
@@ -362,9 +295,8 @@
       }).join('');
     }
 
-    // ===== Init Site =====
-    function initSite(){
-      if(typeof XLSX==='undefined'){ fatal('SheetJS failed to load.'); return; }
+    // ===== Init =====
+    function init(){
       Promise.all([
         d3.json('https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json'),
         fetch('2025 - Top Political Races and Data.xlsx').then(r=>{ if(!r.ok) throw new Error('Data file missing'); return r.arrayBuffer(); })
@@ -373,9 +305,7 @@
         const wb = XLSX.read(buf,{type:'array'});
         const sheet = wb.Sheets[wb.SheetNames[0]];
         const table = XLSX.utils.sheet_to_json(sheet,{header:1});
-        const rows = table.slice(2); // skip header rows like original
-
-        // Build map keyed by state name
+        const rows = table.slice(2);
         rows.forEach(row=>{
           const state = row[0]; if(!state) return;
           const entry = {
@@ -393,28 +323,19 @@
           };
           stateData.set(state, entry);
         });
-
         renderMap(us);
-        // Prime UI with a neutral state
         document.getElementById('detailsBody').innerHTML = `<div class="subtle">Select a state on the map.</div>`;
         renderInsights(null);
       })
-      .catch(err=> fatal(err.message));
+      .catch(err=>{
+        document.getElementById('map').innerHTML = `<p style="color:#ff7b39;padding:2rem;text-align:center">${err.message}</p>`;
+      });
     }
 
-    function fatal(msg){
-      const map = document.getElementById('map');
-      map.innerHTML = `<p style="color:#ef4444;padding:2rem;text-align:center">${msg}</p>`;
-    }
+    // Kick off once libs are ready
+    if(window.XLSX){ init(); }
+    else { window.addEventListener('load', init); }
   })();
-
-
-  const aboutModal = document.getElementById('aboutModal');
-    const infoBtn = document.getElementById('infoBtn');
-    const closeModal = document.getElementById('closeModal');
-    if(infoBtn){ infoBtn.addEventListener('click', ()=>{ aboutModal.style.display='flex'; }); }
-    if(closeModal){ closeModal.addEventListener('click', ()=>{ aboutModal.style.display='none'; }); }
-    document.addEventListener('keydown', (e)=>{ if(e.key==='Escape'){ aboutModal.style.display='none'; } });
   </script>
 </body>
 </html>
