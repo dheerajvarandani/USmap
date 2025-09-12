@@ -270,12 +270,22 @@ tt.style.top = y + 'px';
           <div class="stat"><label>Asian</label><strong>${fmtPct(data["% Asian"])}</strong></div>
         </div>`;
 
+        const generations = `
+        <div class="grid">
+          <div class="stat"><label>Gen Z (18–29)</label><strong>${fmtPct(data["Gen Z"])}</strong></div>
+          <div class="stat"><label>Millennials (30–44)</label><strong>${fmtPct(data["Millennials"])}</strong></div>
+          <div class="stat"><label>Gen X (45–59)</label><strong>${fmtPct(data["Gen X"])}</strong></div>
+          <div class="stat"><label>Boomers (60–79)</label><strong>${fmtPct(data["Boomers"])}</strong></div>
+        </div>`;
+
       el.innerHTML = `
         <h3>${name}</h3>
         <div class="subtle" style="margin:.1rem 0 .6rem">${data["Race Type"] ?? ''}${data["Race Description"]? ' • ' + data["Race Description"] : ''}</div>
         ${data["Narrative"]? `<div class="group"><h4>Narrative</h4><div class="subtle">${data["Narrative"]}</div></div>`:''}
         <div class="group"><h4>Population</h4>${pop}</div>
+        <div class="group"><h4>Generations</h4>${generations}</div>
       `;
+
     }
 
     function renderInsights(data){
@@ -315,12 +325,17 @@ tt.style.top = y + 'px';
             "% White": row[5], "% Hispanic": row[6], "% Asian": row[7], "% African American": row[8],
             "Narrative": row[9],
             "Eligible Voter": row[55],
+            "Gen Z": row[56],         // column G
+            "Millennials": row[57],   // column H
+            "Gen X": row[58],         // column I
+            "Boomers": row[59],       // column J
             "Top Shows": extractTop(row, 10),
             "Top Channels": extractTop(row, 19),
             "Top Mobile Apps": extractTop(row, 28),
             "Top Location Visits": extractTop(row, 37),
             "Top Segments": extractTop(row, 46)
           };
+
           stateData.set(state, entry);
         });
         renderMap(us);
